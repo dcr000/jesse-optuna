@@ -192,7 +192,7 @@ def objective(trial):
         logger.error("".join(traceback.TracebackException.from_exception(err).format()))
         raise err
 
-    if trial.number % 10 == 0:
+    if trial.number % 10 == 0 and trial.number > 0:
         total_trials = cfg['n_trials']
         current_trial_number = trial.number 
         completion_percentage = (current_trial_number / total_trials) * 100
