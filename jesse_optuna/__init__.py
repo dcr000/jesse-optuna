@@ -101,10 +101,12 @@ def run() -> None:
                     else:
                         print("Exiting.")
                         return
+                    send_discord_message(f"Optimization started. {cfg['strategy_name']}")
                     first_attempt = False
             else:
                 study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
                                         storage=storage, load_if_exists=True)
+                send_discord_message(f"Optimization resumed likely a network error. {cfg['strategy_name']}")
             
             # Set study user attributes
             study.set_user_attr("strategy_name", cfg['strategy_name'])
@@ -140,8 +142,6 @@ def run() -> None:
             time.sleep(retry_delay)  # Wait before retrying in case of an unexpected error
 
 
-
-
 def get_config():
     cfg_file = pathlib.Path('optuna_config.yml')
 
@@ -163,8 +163,6 @@ def send_discord_message(message):
 
 def objective(trial):
     cfg = get_config()
-    if trial.number == 0:
-        message_id = send_discord_message(f"Optimization started. {cfg['strategy_name']}")
     
 
     StrategyClass = jh.get_strategy_class(cfg['strategy_name'])
