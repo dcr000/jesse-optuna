@@ -155,9 +155,25 @@ def get_config():
 
 def send_discord_message(message):
     cfg = get_config()
-    data = {"content": message}
-    response = requests.post(cfg['WEBHOOK_URL'], json=data)
-    return response.json()['id']  # Return the message ID for editing later
+    url = cfg['WEBHOOK_URL']
+    data = {"content": content}
+    headers = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
+
+        # Now we check if the response is valid JSON
+        try:
+            message_id = response.json().get('id')  # Safely access the ID if it exists
+            return message_id
+        except ValueError:  # Catch the JSONDecodeError
+            print("Response content is not valid JSON.")
+            return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while sending the Discord message: {e}")
+        return None
 
 def update_discord_message(message_id, new_message):
     cfg = get_config()
