@@ -180,6 +180,7 @@ def objective(trial):
         logger.error("".join(traceback.TracebackException.from_exception(err).format()))
         raise err
 
+    print(f"current trial:{trial.number}")
 
     if training_data_metrics is None:
         return np.nan
