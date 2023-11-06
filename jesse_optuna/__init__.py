@@ -198,7 +198,7 @@ def objective(trial):
         elapsed_time = current_time - start_time
         estimated_total_time = elapsed_time * (total_trials / current_trial_number)
         estimated_end_time = start_time + estimated_total_time
-        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials'] estimated end time: {estimated_end_time} {cfg['strategy_name']}"
+        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials']} estimated end time: {estimated_end_time} {cfg['strategy_name']}"
         send_discord_message(update_message)
     
 
