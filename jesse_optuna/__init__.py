@@ -156,7 +156,7 @@ def get_config():
 def send_discord_message(message):
     cfg = get_config()
     url = cfg['WEBHOOK_URL']
-    data = {"content": content}
+    data = {"content": message}
     headers = {"Content-Type": "application/json"}
 
     try:
