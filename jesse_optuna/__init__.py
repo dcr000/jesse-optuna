@@ -154,6 +154,7 @@ def get_config():
     return cfg
 
 def send_discord_message(message):
+    cfg = get_config()
     data = {"content": message}
     response = requests.post(cfg['WEBHOOK_URL'], json=data)
     return response.json()['id']  # Return the message ID for editing later
