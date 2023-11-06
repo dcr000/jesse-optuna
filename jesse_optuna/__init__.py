@@ -17,6 +17,7 @@ import time
 from optuna.exceptions import StorageInternalError
 import psycopg2
 from psycopg2 import OperationalError
+import requests
 
 
 logger = logging.getLogger()
@@ -151,8 +152,20 @@ def get_config():
 
     return cfg
 
+def send_discord_message(message):
+    data = {"content": message}
+    response = requests.post(WEBHOOK_URL, json=data)
+    return response.json()['id']  # Return the message ID for editing later
 
+def update_discord_message(message_id, new_message):
+    edit_url = f"{WEBHOOK_URL}/messages/{message_id}"
+    data = {"content": new_message}
+    requests.patch(edit_url, json=data)
+message_id = None
 def objective(trial):
+    global message_id
+    if message_id == None:
+        message_id = send_discord_message("Optimization started.")
     cfg = get_config()
 
     StrategyClass = jh.get_strategy_class(cfg['strategy_name'])
@@ -180,7 +193,10 @@ def objective(trial):
         logger.error("".join(traceback.TracebackException.from_exception(err).format()))
         raise err
 
-    print(f"current trial:{trial.number}")
+    if trial.number % 100 == 0:
+        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials']}"
+        update_discord_message(message_id, update_message)
+    
 
     if training_data_metrics is None:
         return np.nan
