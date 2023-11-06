@@ -72,28 +72,54 @@ def run() -> None:
     optuna.logging.enable_propagation()
     optuna.logging.disable_default_handler()
 
-    try:
-        study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
+    # Initialize retry parameters
+    retry_delay = 1  # Start with a 1 second delay
+    max_delay = 600  # Maximum delay of 10 minutes
+
+    while True:
+        try:
+            # Try to create or load the study
+            try:
+                study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
                                     storage=storage, load_if_exists=False)
-    except optuna.exceptions.DuplicatedStudyError:
-        if click.confirm('Previous study detected. Do you want to resume?', default=True):
-            study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
+            except optuna.exceptions.DuplicatedStudyError:
+                if click.confirm('Previous study detected. Do you want to resume?', default=True):
+                    study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
                                         storage=storage, load_if_exists=True)
-        elif click.confirm('Delete previous study and start new?', default=False):
-            optuna.delete_study(study_name=study_name, storage=storage)
-            study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
+                elif click.confirm('Delete previous study and start new?', default=False):
+                    optuna.delete_study(study_name=study_name, storage=storage)
+                    study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
                                         storage=storage, load_if_exists=False)
-        else:
-            print("Exiting.")
-            exit(1)
+                else:
+                    print("Exiting.")
+                    return
+            
+            # Set study user attributes
+            study.set_user_attr("strategy_name", cfg['strategy_name'])
+            study.set_user_attr("exchange", cfg['exchange'])
+            study.set_user_attr("symbol", cfg['symbol'])
+            study.set_user_attr("timeframe", cfg['timeframe'])
 
-    study.set_user_attr("strategy_name", cfg['strategy_name'])
-    study.set_user_attr("exchange", cfg['exchange'])
-    study.set_user_attr("symbol", cfg['symbol'])
-    study.set_user_attr("timeframe", cfg['timeframe'])
+            # Start optimization
+            study.optimize(objective, n_jobs=cfg['n_jobs'], n_trials=cfg['n_trials'])
 
+            # If optimization is successful, break out of the loop
+            break
+        except (StorageInternalError, psycopg2.OperationalError) as e:
+            # Log the error
+            logger.error(f"Optimization attempt failed: {e}")
+            logger.error(f"Retrying after {retry_delay} seconds...")
+            
+            # Sleep for the delay duration before retrying
+            time.sleep(retry_delay)
 
-    study.optimize(objective, n_jobs=cfg['n_jobs'], n_trials=cfg['n_trials'])
+            # Double the delay for the next retry, but do not exceed the max_delay
+            retry_delay = min(max_delay, retry_delay * 2)
+        except Exception as e:
+            # For any other exceptions, log the error and re-raise the exception
+            logger.error(f"An unexpected error occurred: {e}")
+            raise
+
 
 
 def get_config():
