@@ -19,6 +19,7 @@ import psycopg2
 from psycopg2 import OperationalError
 import requests
 
+WEBHOOK_URL = ''
 
 logger = logging.getLogger()
 logger.addHandler(logging.FileHandler("jesse-optuna.log", mode="w"))
@@ -154,11 +155,13 @@ def get_config():
 
 def send_discord_message(message):
     data = {"content": message}
-    response = requests.post(WEBHOOK_URL, json=data)
+    response = requests.post(cfg['WEBHOOK_URL'], json=data)
     return response.json()['id']  # Return the message ID for editing later
 
 def update_discord_message(message_id, new_message):
-    edit_url = f"{WEBHOOK_URL}/messages/{message_id}"
+    cfg = get_config()
+    
+    edit_url = f"{cfg['WEBHOOK_URL']}/messages/{message_id}"
     data = {"content": new_message}
     requests.patch(edit_url, json=data)
 message_id = None
