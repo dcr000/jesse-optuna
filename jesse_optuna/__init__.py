@@ -162,9 +162,10 @@ def send_discord_message(message):
     response = requests.post(url, json=data, headers=headers)
 
 def objective(trial):
+    cfg = get_config()
     if trial.number == 0:
         message_id = send_discord_message(f"Optimization started. {cfg['strategy_name']}")
-    cfg = get_config()
+    
 
     StrategyClass = jh.get_strategy_class(cfg['strategy_name'])
     hp_dict = StrategyClass().hyperparameters()
