@@ -194,12 +194,13 @@ def objective(trial):
     if trial.number % 100 == 0:
         total_trials = cfg['n_trials']
         current_trial_number = trial.number 
+        completion_percentage = (current_trial_number / total_trials) * 100
         start_time = trial.datetime_start
         current_time = datetime.now()
         elapsed_time = current_time - start_time
         estimated_total_time = elapsed_time * (total_trials / current_trial_number)
         estimated_end_time = start_time + estimated_total_time
-        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials']} \n estimated end time: {estimated_end_time} \n {cfg['strategy_name']}"
+        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials']} \n Completion: {completion_percentage:.2f}% \n estimated end time: {estimated_end_time} \n {cfg['strategy_name']}"
         send_discord_message(update_message)
     
 
