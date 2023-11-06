@@ -158,34 +158,11 @@ def send_discord_message(message):
     url = cfg['WEBHOOK_URL']
     data = {"content": message}
     headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=data, headers=headers)
 
-    try:
-        response = requests.post(url, json=data, headers=headers)
-        response.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
-
-        # Now we check if the response is valid JSON
-        try:
-            message_id = response.json().get('id')  # Safely access the ID if it exists
-            return message_id
-        except ValueError:  # Catch the JSONDecodeError
-            print("Response content is not valid JSON.")
-            return None
-
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while sending the Discord message: {e}")
-        return None
-
-def update_discord_message(message_id, new_message):
-    cfg = get_config()
-    
-    edit_url = f"{cfg['WEBHOOK_URL']}/messages/{message_id}"
-    data = {"content": new_message}
-    requests.patch(edit_url, json=data)
-message_id = None
 def objective(trial):
-    global message_id
-    if message_id == None:
-        message_id = send_discord_message("Optimization started.")
+    if trial.number == 0:
+        message_id = send_discord_message(f"Optimization started. {cfg['strategy_name']}")
     cfg = get_config()
 
     StrategyClass = jh.get_strategy_class(cfg['strategy_name'])
@@ -214,8 +191,15 @@ def objective(trial):
         raise err
 
     if trial.number % 100 == 0:
-        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials']}"
-        update_discord_message(message_id, update_message)
+        total_trials = cfg['n_trials']
+        current_trial_number = trial.number 
+        start_time = trial.datetime_start
+        current_time = datetime.now()
+        elapsed_time = current_time - start_time
+        estimated_total_time = elapsed_time * (total_trials / current_trial_number)
+        estimated_end_time = start_time + estimated_total_time
+        update_message = f"Optimization progress: trial {trial.number}/{cfg['n_trials'] estimated end time: {estimated_end_time} {cfg['strategy_name']}}"
+        send_discord_message( update_message))
     
 
     if training_data_metrics is None:
