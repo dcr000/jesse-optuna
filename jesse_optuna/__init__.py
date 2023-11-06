@@ -15,6 +15,8 @@ from jesse.research import backtest, get_candles
 from .JoblilbStudy import JoblibStudy
 import time
 from optuna.exceptions import StorageInternalError
+import psycopg2
+from psycopg2 import OperationalError
 
 
 logger = logging.getLogger()
@@ -41,7 +43,7 @@ def create_config() -> None:
 def create_db(db_name: str) -> None:
     validate_cwd()
     cfg = get_config()
-    import psycopg2
+    
 
     # establishing the connection
     conn = psycopg2.connect(
@@ -80,7 +82,6 @@ def run() -> None:
 
     while True:
         try:
-            # Try to create or load the study
             try:
                 study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
                                     storage=storage, load_if_exists=False)
@@ -107,20 +108,28 @@ def run() -> None:
 
             # If optimization is successful, break out of the loop
             break
-        except (StorageInternalError, psycopg2.OperationalError) as e:
-            # Log the error
-            logger.error(f"Optimization attempt failed: {e}")
-            logger.error(f"Retrying after {retry_delay} seconds...")
-            
-            # Sleep for the delay duration before retrying
-            time.sleep(retry_delay)
+        except OperationalError as e:
+            if 'the database system is shutting down' in str(e) or 'server closed the connection unexpectedly' in str(e):
+                # Handle expected database disconnection errors.
+                print(f"Database connection lost. Attempting to reconnect in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, max_delay)  # Exponential backoff with a maximum
+            else:
+                # Handle other kinds of operational errors.
+                print(f"Encountered an operational error not related to connection loss: {e}")
+                time.sleep(retry_delay)  # Wait before retrying in case of other operational errors
+                # Optionally, you can also implement a maximum retry delay for other operational errors
 
-            # Double the delay for the next retry, but do not exceed the max_delay
-            retry_delay = min(max_delay, retry_delay * 2)
+        except KeyboardInterrupt:
+            # Handle manual interruption from the user (Ctrl+C).
+            print("Manual interruption received. Stopping the process.")
+            break
+
         except Exception as e:
-            # For any other exceptions, log the error and re-raise the exception
-            logger.error(f"An unexpected error occurred: {e}")
-            raise
+            # Handle all other exceptions that might occur.
+            print(f"An unexpected error occurred: {e}")
+            time.sleep(retry_delay)  # Wait before retrying in case of an unexpected error
+
 
 
 
