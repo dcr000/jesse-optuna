@@ -45,33 +45,43 @@ class JoblibStudy:
     def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
         # Create a Dask client
         client = Client(f'tcp://{self.dask_ip}:{self.dask_port}')
+        print("Connected to Dask client.")
+
         # List to store futures
         futures = []
 
-        # Function to submit tasks
-        def submit_tasks(num_tasks):
-            nonlocal n_trials
-            for _ in range(min(num_tasks, n_trials)):
-                future = client.submit(func, pure=False, **optimize_parameters)
-                futures.append(future)
-                n_trials -= 1
-
         # Submit initial set of tasks
-        submit_tasks(len(client.scheduler_info()['workers']))
+        initial_workers = len(client.scheduler_info()['workers'])
+        print(f"Initial number of workers: {initial_workers}")
+        for _ in range(min(n_trials, initial_workers)):
+            future = client.submit(func, pure=False, **optimize_parameters)
+            futures.append(future)
+            n_trials -= 1
+            print(f"Submitted task, {n_trials} trials remaining.")
 
-        # Use as_completed to manage task completion and submission of new tasks
-        for future in as_completed(futures):
+        # Continuously manage task submission and completion
+        while n_trials > 0 or futures:
+            # Check for completed tasks
+            completed_futures = [f for f in as_completed(futures, timeout=0.1)]
+            for future in completed_futures:
+                futures.remove(future)
+                print("Task completed.")
+
+            # Check for new workers and submit new tasks
             current_workers = len(client.scheduler_info()['workers'])
-            # Number of tasks to submit is the difference between workers and tasks in progress
-            tasks_to_submit = current_workers - len(futures) + 1
-            if tasks_to_submit > 0 and n_trials > 0:
-                submit_tasks(tasks_to_submit)
+            available_slots = current_workers - len(futures)
+            for _ in range(min(n_trials, available_slots)):
+                new_future = client.submit(func, pure=False, **optimize_parameters)
+                futures.append(new_future)
+                n_trials -= 1
+                print(f"New task submitted, {n_trials} trials remaining.")
 
-            # Optional: Add a small delay to reduce the frequency of scheduler queries
+            # Optional: Adjust the sleep duration as needed
             time.sleep(0.1)
 
         # Gather results
         results = client.gather(futures)
+        print("All tasks completed.")
 
         client.close()
         return results
