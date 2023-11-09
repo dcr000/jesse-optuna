@@ -2,7 +2,7 @@ import copy
 
 import optuna
 import numpy as np
-from dask.distributed import Client
+from dask.distributed import Client , as_completed
 import yaml
 import pathlib
 
