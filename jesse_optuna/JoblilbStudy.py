@@ -1,8 +1,8 @@
 import copy
 
 import optuna
-import joblib
 import numpy as np
+from dask.distributed import Client
 
 class JoblibStudy:
     def __init__(self, **study_parameters):
@@ -25,18 +25,36 @@ class JoblibStudy:
             yield n_per_job + (1 if remaining > 0 else 0)
             remaining -= 1
 
-    def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
-        if n_jobs == -1:
-            n_jobs = joblib.cpu_count()
+    # def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
+    #     if n_jobs == -1:
+    #         n_jobs = joblib.cpu_count()
 
-        if n_jobs == 1:
-            self.study.optimize(n_trials=n_trials, **optimize_parameters)
-        else:
-            parallel = joblib.Parallel(n_jobs, verbose=10, max_nbytes=None)
-            parallel(
-                joblib.delayed(self._optimize_study)(func, n_trials=n_trials_i, **optimize_parameters)
-                for n_trials_i in self._split_trials(n_trials, n_jobs)
-            )
+    #     if n_jobs == 1:
+    #         self.study.optimize(n_trials=n_trials, **optimize_parameters)
+    #     else:
+    #         parallel = joblib.Parallel(n_jobs, verbose=10, max_nbytes=None)
+    #         parallel(
+    #             joblib.delayed(self._optimize_study)(func, n_trials=n_trials_i, **optimize_parameters)
+    #             for n_trials_i in self._split_trials(n_trials, n_jobs)
+    #         )
+
+
+    def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
+        # Create a Dask client
+        client = Client('tcp://172.23.0.4:8786')
+        # Split trials among workers
+        trials_per_job = list(self._split_trials(n_trials, len(client.scheduler_info()['workers'])))
+        
+        # Submit all tasks at once and let Dask handle the distribution
+        futures = [client.submit(self._optimize_study, func,pure=False, n_trials=n_trials_i, **optimize_parameters)
+                   for n_trials_i in trials_per_job]
+
+        # Wait for all tasks to complete
+        results = client.gather(futures)
+
+        client.close()
+        return results
+
 
     def set_user_attr(self, key: str, value):
         if isinstance(value, np.integer):
