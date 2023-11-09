@@ -48,19 +48,27 @@ class JoblibStudy:
         # List to store futures
         futures = []
 
+        # Function to submit tasks
+        def submit_tasks(num_tasks):
+            nonlocal n_trials
+            for _ in range(min(num_tasks, n_trials)):
+                future = client.submit(func, pure=False, **optimize_parameters)
+                futures.append(future)
+                n_trials -= 1
+
         # Submit initial set of tasks
-        for _ in range(min(n_trials, len(client.scheduler_info()['workers']))):
-            future = client.submit(func, pure=False, **optimize_parameters)
-            futures.append(future)
-            n_trials -= 1
+        submit_tasks(len(client.scheduler_info()['workers']))
 
         # Use as_completed to manage task completion and submission of new tasks
         for future in as_completed(futures):
-            if n_trials > 0:
-                # Submit a new task as soon as a worker is free
-                new_future = client.submit(func, pure=False, **optimize_parameters)
-                futures.append(new_future)
-                n_trials -= 1
+            current_workers = len(client.scheduler_info()['workers'])
+            # Number of tasks to submit is the difference between workers and tasks in progress
+            tasks_to_submit = current_workers - len(futures) + 1
+            if tasks_to_submit > 0 and n_trials > 0:
+                submit_tasks(tasks_to_submit)
+
+            # Optional: Add a small delay to reduce the frequency of scheduler queries
+            time.sleep(0.1)
 
         # Gather results
         results = client.gather(futures)
