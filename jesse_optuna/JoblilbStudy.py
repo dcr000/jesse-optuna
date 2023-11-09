@@ -45,14 +45,24 @@ class JoblibStudy:
     def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
         # Create a Dask client
         client = Client(f'tcp://{self.dask_ip}:{self.dask_port}')
-        # Split trials among workers
-        trials_per_job = list(self._split_trials(n_trials, len(client.scheduler_info()['workers'])))
-        
-        # Submit all tasks at once and let Dask handle the distribution
-        futures = [client.submit(self._optimize_study, func,pure=False, n_trials=n_trials_i, **optimize_parameters)
-                   for n_trials_i in trials_per_job]
+        # List to store futures
+        futures = []
 
-        # Wait for all tasks to complete
+        # Submit initial set of tasks
+        for _ in range(min(n_trials, len(client.scheduler_info()['workers']))):
+            future = client.submit(func, pure=False, **optimize_parameters)
+            futures.append(future)
+            n_trials -= 1
+
+        # Use as_completed to manage task completion and submission of new tasks
+        for future in as_completed(futures):
+            if n_trials > 0:
+                # Submit a new task as soon as a worker is free
+                new_future = client.submit(func, pure=False, **optimize_parameters)
+                futures.append(new_future)
+                n_trials -= 1
+
+        # Gather results
         results = client.gather(futures)
 
         client.close()
