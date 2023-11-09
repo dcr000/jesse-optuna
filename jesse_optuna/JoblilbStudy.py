@@ -8,6 +8,7 @@ import pathlib
 
 class JoblibStudy:
     def __init__(self, **study_parameters):
+        self.get_config()
         self.study_parameters = study_parameters
         self.study: optuna.study.Study = optuna.create_study(**study_parameters)
 
