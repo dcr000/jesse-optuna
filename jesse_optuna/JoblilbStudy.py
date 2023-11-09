@@ -5,6 +5,7 @@ import numpy as np
 from dask.distributed import Client , as_completed
 import yaml
 import pathlib
+import time
 
 class JoblibStudy:
     def __init__(self, **study_parameters):
