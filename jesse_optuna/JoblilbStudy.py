@@ -3,6 +3,8 @@ import copy
 import optuna
 import numpy as np
 from dask.distributed import Client
+import yaml
+import pathlib
 
 class JoblibStudy:
     def __init__(self, **study_parameters):
@@ -41,7 +43,7 @@ class JoblibStudy:
 
     def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
         # Create a Dask client
-        client = Client('tcp://172.23.0.4:8786')
+        client = Client(f'tcp://{self.dask_ip}:{self.dask_port}')
         # Split trials among workers
         trials_per_job = list(self._split_trials(n_trials, len(client.scheduler_info()['workers'])))
         
@@ -70,3 +72,18 @@ class JoblibStudy:
             return getattr(self.study, name)
         else:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        
+    def get_config(self):
+        cfg_file = pathlib.Path('optuna_config.yml')
+
+        if not cfg_file.is_file():
+            print("optuna_config.yml not found. Run create-config command.")
+            exit()
+        else:
+            with open("optuna_config.yml", "r") as ymlfile:
+                cfg = yaml.load(ymlfile, yaml.SafeLoader)
+                
+        self.dask_ip = cfg['dask_scheduler_ip']
+        self.dask_port = cfg['dask_scheduler_port']
+
+        return cfg
