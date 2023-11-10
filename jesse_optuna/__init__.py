@@ -18,6 +18,7 @@ import psycopg2
 from psycopg2 import OperationalError
 import requests
 from datetime import datetime
+from dask.distributed import Client, as_completed
 
 logger = logging.getLogger()
 logger.addHandler(logging.FileHandler("jesse-optuna.log", mode="w"))
@@ -59,6 +60,26 @@ def create_db(db_name: str) -> None:
     # Closing the connection
     conn.close()
 
+def pre_load_candles(exchange: str, symbol: str, start_date: str, finish_date: str):
+    try:
+        path = pathlib.Path('storage/jesse-optuna')
+        path.mkdir(parents=True, exist_ok=True)
+
+        cache_file_name = f"{exchange}-{symbol}-1m-{start_date}-{finish_date}.pickle"
+        cache_file = pathlib.Path(f'storage/jesse-optuna/{cache_file_name}')
+
+        if cache_file.is_file():
+            with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
+                candles = pickle.load(handle)
+        else:
+            candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
+            with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
+                pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        return True
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return False
 
 @cli.command()
 def run() -> None:
@@ -69,14 +90,47 @@ def run() -> None:
     
     storage = f"postgresql://{cfg['postgres_username']}:{cfg['postgres_password']}@{cfg['postgres_host']}:{cfg['postgres_port']}/{cfg['postgres_db_name']}"
 
-    # Connect to the PostgreSQL database
-    connection = psycopg2.connect(storage)
+    client = Client(f"tcp://{cfg['dask_scheduler_ip']}:{cfg['dask_scheduler_port']}")
 
-    # If the connection is successful, print a success message
-    print("Connection to PostgreSQL DB successful")
+    # Assuming you have a list of parameters for the tasks
+    parameters_list = [
+            cfg['exchange'],
+            cfg['symbol'],
+            cfg['timespan-train']['start_date'],
+            cfg['timespan-train']['finish_date'],
+        ]  # List of tuples (exchange, symbol, start_date, finish_date)
 
-    # Close the connection
-    connection.close()
+    tasks = []
+    for params in parameters_list:
+        future = client.submit(pre_load_candles, *params)
+        tasks.append(future)
+        # Wait for the task to complete before submitting the next one
+        c_ok = as_completed(tasks).result()
+        print(f"got gandles: {c_ok}")
+
+    # Gather results after all tasks are completed
+    results = client.gather(tasks)
+    
+        # Assuming you have a list of parameters for the tasks
+    parameters_list = [
+            cfg['exchange'],
+            cfg['symbol'],
+            cfg['timespan-testing']['start_date'],
+            cfg['timespan-testing']['finish_date'],
+        ]  # List of tuples (exchange, symbol, start_date, finish_date)
+
+    tasks = []
+    for params in parameters_list:
+        future = client.submit(pre_load_candles, *params)
+        tasks.append(future)
+        # Wait for the task to complete before submitting the next one
+        c_ok = as_completed(tasks).result()
+        print(f"got gandles: {c_ok}")
+
+    # Gather results after all tasks are completed
+    results = client.gather(tasks)
+    
+    client.close()
         
     sampler = optuna.samplers.NSGAIISampler(population_size=cfg['population_size'], mutation_prob=cfg['mutation_prob'],
                                             crossover_prob=cfg['crossover_prob'], swapping_prob=cfg['swapping_prob'])
