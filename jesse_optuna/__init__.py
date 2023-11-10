@@ -14,13 +14,10 @@ import yaml
 from jesse.research import backtest, get_candles
 from .JoblilbStudy import JoblibStudy
 import time
-from optuna.exceptions import StorageInternalError
 import psycopg2
 from psycopg2 import OperationalError
 import requests
 from datetime import datetime
-
-WEBHOOK_URL = ''
 
 logger = logging.getLogger()
 logger.addHandler(logging.FileHandler("jesse-optuna.log", mode="w"))
@@ -32,7 +29,6 @@ optuna.logging.enable_propagation()
 @click.version_option(pkg_resources.get_distribution("jesse-optuna").version)
 def cli() -> None:
     pass
-
 
 @cli.command()
 def create_config() -> None:
@@ -47,7 +43,6 @@ def create_db(db_name: str) -> None:
     validate_cwd()
     cfg = get_config()
     
-
     # establishing the connection
     conn = psycopg2.connect(
         database="postgres", user=cfg['postgres_username'], password=cfg['postgres_password'], host=cfg['postgres_host'], port=cfg['postgres_port']
@@ -71,8 +66,18 @@ def run() -> None:
 
     cfg = get_config()
     study_name = f"{cfg['strategy_name']}-{cfg['exchange']}-{cfg['symbol']}-{cfg['timeframe']}"
+    
     storage = f"postgresql://{cfg['postgres_username']}:{cfg['postgres_password']}@{cfg['postgres_host']}:{cfg['postgres_port']}/{cfg['postgres_db_name']}"
 
+    # Connect to the PostgreSQL database
+    connection = psycopg2.connect(storage)
+
+    # If the connection is successful, print a success message
+    print("Connection to PostgreSQL DB successful")
+
+    # Close the connection
+    connection.close()
+        
     sampler = optuna.samplers.NSGAIISampler(population_size=cfg['population_size'], mutation_prob=cfg['mutation_prob'],
                                             crossover_prob=cfg['crossover_prob'], swapping_prob=cfg['swapping_prob'])
 
@@ -101,13 +106,11 @@ def run() -> None:
                     else:
                         print("Exiting.")
                         return
-                    send_discord_message(f"Optimization started. {cfg['strategy_name']}")
                     first_attempt = False
             else:
                 study = JoblibStudy(study_name=study_name, direction="maximize", sampler=sampler,
                                         storage=storage, load_if_exists=True)
-                send_discord_message(f"Optimization resumed likely a network error. {cfg['strategy_name']}")
-            
+
             # Set study user attributes
             study.set_user_attr("strategy_name", cfg['strategy_name'])
             study.set_user_attr("exchange", cfg['exchange'])
@@ -116,8 +119,7 @@ def run() -> None:
 
             # Start optimization
             study.optimize(objective, n_jobs=cfg['n_jobs'], n_trials=cfg['n_trials'])
-            
-            # If optimization is successful, break out of the loop
+
             break
         except OperationalError as e:
             if 'the database system is shutting down' in str(e) or 'server closed the connection unexpectedly' in str(e):
@@ -154,20 +156,12 @@ def get_config():
 
     return cfg
 
-def send_discord_message(message):
-    cfg = get_config()
-    url = cfg['WEBHOOK_URL']
-    data = {"content": message}
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=data, headers=headers)
-
 def objective(trial):
     cfg = get_config()
     
-
     StrategyClass = jh.get_strategy_class(cfg['strategy_name'])
     hp_dict = StrategyClass().hyperparameters()
-
+    
     for st_hp in hp_dict:
         if st_hp['type'] is int:
             if 'step' not in st_hp:
@@ -190,22 +184,8 @@ def objective(trial):
         logger.error("".join(traceback.TracebackException.from_exception(err).format()))
         raise err
 
-    if trial.number % 100 == 0 and trial.number > 0:
-        total_trials = cfg['n_trials']
-        current_trial_number = trial.number 
-        completion_percentage = (current_trial_number / total_trials) * 100
-        start_time = trial.datetime_start
-        current_time = datetime.now()
-        elapsed_time = current_time - start_time
-        estimated_total_time = elapsed_time * (total_trials / current_trial_number)
-        estimated_end_time = start_time + estimated_total_time
-        update_message = f"\n Optimization Progress: {trial.number}/{cfg['n_trials']} \n Completion: {completion_percentage:.2f}% \n Estimated End Time: {estimated_end_time} \n Estimated Time Left: {estimated_total_time}\n Strategy Name: {cfg['strategy_name']}"
-        send_discord_message(update_message)
-    
-
     if training_data_metrics is None:
         return np.nan
-
 
     if training_data_metrics['total'] <= 5:
         return np.nan
@@ -301,7 +281,6 @@ def get_candles_with_cache(exchange: str, symbol: str, start_date: str, finish_d
 
 
 def backtest_function(start_date, finish_date, hp, cfg):
-
     candles = {}
     extra_routes = []
     if len(cfg['extra_routes']) != 0:
@@ -343,7 +322,6 @@ def backtest_function(start_date, finish_date, hp, cfg):
         'settlement_currency': cfg['settlement_currency'],
         'warm_up_candles': cfg['warm_up_candles']
     }
-
 
     backtest_data = backtest(config, route, extra_routes, candles, hyperparameters = hp)['metrics']
 
