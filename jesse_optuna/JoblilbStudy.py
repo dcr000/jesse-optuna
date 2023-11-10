@@ -1,11 +1,9 @@
 import copy
-
 import optuna
 import numpy as np
 from dask.distributed import Client , as_completed
 import yaml
 import pathlib
-import time
 
 class JoblibStudy:
     def __init__(self, **study_parameters):
@@ -21,72 +19,21 @@ class JoblibStudy:
         study.sampler.reseed_rng()
         study.optimize(func, n_trials=n_trials, **optimize_parameters, catch=(Exception,))
 
-
-    @staticmethod
-    def _split_trials(n_trials, n_jobs):
-        n_per_job, remaining = divmod(n_trials, n_jobs)
-        for _ in range(n_jobs):
-            yield n_per_job + (1 if remaining > 0 else 0)
-            remaining -= 1
-
-    # def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
-    #     if n_jobs == -1:
-    #         n_jobs = joblib.cpu_count()
-
-    #     if n_jobs == 1:
-    #         self.study.optimize(n_trials=n_trials, **optimize_parameters)
-    #     else:
-    #         parallel = joblib.Parallel(n_jobs, verbose=10, max_nbytes=None)
-    #         parallel(
-    #             joblib.delayed(self._optimize_study)(func, n_trials=n_trials_i, **optimize_parameters)
-    #             for n_trials_i in self._split_trials(n_trials, n_jobs)
-    #         )
-
-
-    def optimize(self, func, n_trials=1, n_jobs=-1, **optimize_parameters):
+    def optimize(self, func, n_trials=1, **optimize_parameters):
         # Create a Dask client
         client = Client(f'tcp://{self.dask_ip}:{self.dask_port}')
         print("Connected to Dask client.")
 
-        # List to store futures
-        futures = []
+        # Submit all tasks at once and let Dask handle the distribution
+        futures = [client.submit(self._optimize_study, func,pure=False, n_trials=1, **optimize_parameters)
+                   for _ in range(n_trials)]
 
-        # Submit initial set of tasks
-        initial_workers = len(client.scheduler_info()['workers'])
-        print(f"Initial number of workers: {initial_workers}")
-        for _ in range(min(n_trials, initial_workers)):
-            future = client.submit(func, pure=False, **optimize_parameters)
-            futures.append(future)
-            n_trials -= 1
-            print(f"Submitted task, {n_trials} trials remaining.")
-
-        # Continuously manage task submission and completion
-        while n_trials > 0 or futures:
-            # Check for completed tasks
-            completed_futures = [f for f in as_completed(futures, timeout=0.1)]
-            for future in completed_futures:
-                futures.remove(future)
-                print("Task completed.")
-
-            # Check for new workers and submit new tasks
-            current_workers = len(client.scheduler_info()['workers'])
-            available_slots = current_workers - len(futures)
-            for _ in range(min(n_trials, available_slots)):
-                new_future = client.submit(func, pure=False, **optimize_parameters)
-                futures.append(new_future)
-                n_trials -= 1
-                print(f"New task submitted, {n_trials} trials remaining.")
-
-            # Optional: Adjust the sleep duration as needed
-            time.sleep(0.1)
-
-        # Gather results
-        results = client.gather(futures)
-        print("All tasks completed.")
+        # Wait for the tasks to complete and gather the results
+        for future in as_completed(futures):
+            result = future.result()  # Handle results here if needed
+            print(f"Result: {result}")
 
         client.close()
-        return results
-
 
     def set_user_attr(self, key: str, value):
         if isinstance(value, np.integer):
