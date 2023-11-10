@@ -118,7 +118,7 @@ def run() -> None:
             study.set_user_attr("timeframe", cfg['timeframe'])
 
             # Start optimization
-            study.optimize(objective, n_jobs=cfg['n_jobs'], n_trials=cfg['n_trials'])
+            study.optimize(objective, n_trials=cfg['n_trials'])
 
             break
         except OperationalError as e:
