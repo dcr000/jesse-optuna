@@ -71,11 +71,13 @@ def pre_load_candles(exchange: str, symbol: str, start_date: str, finish_date: s
         with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
             candles = pickle.load(handle)
             print("Loaded from cache")
+            return True
     else:
         candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
         with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
             pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
             print("Loaded from db")
+            return True
 
 @cli.command()
 def run() -> None:
