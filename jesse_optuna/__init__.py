@@ -16,9 +16,17 @@ from .JoblilbStudy import JoblibStudy
 import time
 import psycopg2
 from psycopg2 import OperationalError
-import requests
-from datetime import datetime
-from dask.distributed import Client, as_completed
+
+
+# Your custom function that always returns True
+def is_notebook():
+    return True
+
+# Monkey patch the original function
+jh.is_notebook = is_notebook
+
+# Test the function
+print(jh.is_notebook())  # This should now always return True
 
 logger = logging.getLogger()
 logger.addHandler(logging.FileHandler("jesse-optuna.log", mode="w"))
@@ -60,24 +68,6 @@ def create_db(db_name: str) -> None:
     # Closing the connection
     conn.close()
 
-def pre_load_candles(exchange: str, symbol: str, start_date: str, finish_date: str):
-    path = pathlib.Path('storage/jesse-optuna')
-    path.mkdir(parents=True, exist_ok=True)
-
-    cache_file_name = f"{exchange}-{symbol}-1m-{start_date}-{finish_date}.pickle"
-    cache_file = pathlib.Path(f'storage/jesse-optuna/{cache_file_name}')
-
-    if cache_file.is_file():
-        with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
-            candles = pickle.load(handle)
-            print("Loaded from cache")
-            return True
-    else:
-        candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
-        with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
-            pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print("Loaded from db")
-            return True
 
 @cli.command()
 def run() -> None:
