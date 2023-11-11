@@ -97,16 +97,21 @@ def run() -> None:
             cfg['timespan-train']['finish_date'],
             )]  # List of tuples (exchange, symbol, start_date, finish_date)
 
-    future = client.submit(lambda: 42)
-    result = client.gather(future)
-    if result:
-        print("Task succeeded")
-    else:
-        print("Task failed")
+    futures = client.submit(lambda: 42)
+    futures.append(future)
+
+    for future in as_completed(futures):
+        result = future.result()
+        if result:
+            print("Task succeeded")
+        else:
+            print("Task failed")
 
     for params in parameters_list:
-        future = client.submit(pre_load_candles, *params)
-        result = client.gather(future)
+        futures = client.submit(pre_load_candles, *params)
+        futures.append(future)
+    for future in as_completed(futures):
+        result = future.result()
         if result:
             print("Task succeeded")
         else:
@@ -121,8 +126,10 @@ def run() -> None:
             )]  # List of tuples (exchange, symbol, start_date, finish_date)
 
     for params in parameters_list:
-        future = client.submit(pre_load_candles, *params)
-        result = client.gather(future)
+        futures = client.submit(pre_load_candles, *params)
+        futures.append(future)
+    for future in as_completed(futures):
+        result = future.result()
         if result:
             print("Task succeeded")
         else:
