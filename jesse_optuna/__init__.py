@@ -61,25 +61,22 @@ def create_db(db_name: str) -> None:
     conn.close()
 
 def pre_load_candles(exchange: str, symbol: str, start_date: str, finish_date: str):
-    try:
-        path = pathlib.Path('storage/jesse-optuna')
-        path.mkdir(parents=True, exist_ok=True)
+    print("cat")
+    # path = pathlib.Path('storage/jesse-optuna')
+    # path.mkdir(parents=True, exist_ok=True)
 
-        cache_file_name = f"{exchange}-{symbol}-1m-{start_date}-{finish_date}.pickle"
-        cache_file = pathlib.Path(f'storage/jesse-optuna/{cache_file_name}')
+    # cache_file_name = f"{exchange}-{symbol}-1m-{start_date}-{finish_date}.pickle"
+    # cache_file = pathlib.Path(f'storage/jesse-optuna/{cache_file_name}')
 
-        if cache_file.is_file():
-            with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
-                candles = pickle.load(handle)
-        else:
-            candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
-            with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
-                pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        return True
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        return False
+    # if cache_file.is_file():
+    #     with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
+    #         candles = pickle.load(handle)
+    #         print("Loaded from cache")
+    # else:
+    #     candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
+    #     with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
+    #         pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    #         print("Loaded from db")
 
 @cli.command()
 def run() -> None:
@@ -92,43 +89,39 @@ def run() -> None:
 
     client = Client(f"tcp://{cfg['dask_scheduler_ip']}:{cfg['dask_scheduler_port']}")
 
+    print("loading candles into cache")
     # Assuming you have a list of parameters for the tasks
-    parameters_list = [
+    parameters_list = [(
             cfg['exchange'],
             cfg['symbol'],
             cfg['timespan-train']['start_date'],
             cfg['timespan-train']['finish_date'],
-        ]  # List of tuples (exchange, symbol, start_date, finish_date)
+            )]  # List of tuples (exchange, symbol, start_date, finish_date)
 
-    tasks = []
     for params in parameters_list:
         future = client.submit(pre_load_candles, *params)
-        tasks.append(future)
-        # Wait for the task to complete before submitting the next one
-        c_ok = as_completed(tasks).result()
-        print(f"got gandles: {c_ok}")
-
-    # Gather results after all tasks are completed
-    results = client.gather(tasks)
+        result = client.gather(future)
+        if result:
+            print("Task succeeded")
+        else:
+            print("Task failed")
     
         # Assuming you have a list of parameters for the tasks
-    parameters_list = [
+    parameters_list = [(
             cfg['exchange'],
             cfg['symbol'],
             cfg['timespan-testing']['start_date'],
             cfg['timespan-testing']['finish_date'],
-        ]  # List of tuples (exchange, symbol, start_date, finish_date)
+            )]  # List of tuples (exchange, symbol, start_date, finish_date)
 
-    tasks = []
     for params in parameters_list:
         future = client.submit(pre_load_candles, *params)
-        tasks.append(future)
-        # Wait for the task to complete before submitting the next one
-        c_ok = as_completed(tasks).result()
-        print(f"got gandles: {c_ok}")
-
-    # Gather results after all tasks are completed
-    results = client.gather(tasks)
+        result = client.gather(future)
+        if result:
+            print("Task succeeded")
+        else:
+            print("Task failed")
+            
     
     client.close()
         
