@@ -89,43 +89,37 @@ def run() -> None:
     client = Client(f"tcp://{cfg['dask_scheduler_ip']}:{cfg['dask_scheduler_port']}")
 
     print("loading candles into cache")
+    scheduler_info = client.scheduler_info()
+    workers = scheduler_info['workers']
+
+    # Number of workers
+    num_workers = len(workers)
     # Assuming you have a list of parameters for the tasks
     parameters_list = [(
             cfg['exchange'],
             cfg['symbol'],
             cfg['timespan-train']['start_date'],
             cfg['timespan-train']['finish_date'],
-            )]  # List of tuples (exchange, symbol, start_date, finish_date)
-
-    futures = []
-    for params in parameters_list:
-        future = client.submit(pre_load_candles, *params)
-        futures.append(future)
-    for future in as_completed(futures):
-        result = future.result()
-        if result:
-            print("Task succeeded")
-        else:
-            print("Task failed")
-    
-        # Assuming you have a list of parameters for the tasks
-    parameters_list = [(
-            cfg['exchange'],
+            ),(cfg['exchange'],
             cfg['symbol'],
             cfg['timespan-testing']['start_date'],
             cfg['timespan-testing']['finish_date'],
-            )]  # List of tuples (exchange, symbol, start_date, finish_date)
+            )]  
+
     futures = []
     for params in parameters_list:
-        future = client.submit(pre_load_candles, *params)
-        futures.append(future)
+        print(params)
+        for i in range(num_workers):
+            future = client.submit(pre_load_candles, *params)
+            print(future)
+            futures.append(future)
+            print(futures)
     for future in as_completed(futures):
         result = future.result()
         if result:
             print("Task succeeded")
         else:
             print("Task failed")
-            
     
     client.close()
         
