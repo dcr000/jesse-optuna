@@ -88,29 +88,6 @@ def run() -> None:
     
     storage = f"postgresql://{cfg['postgres_username']}:{cfg['postgres_password']}@{cfg['postgres_host']}:{cfg['postgres_port']}/{cfg['postgres_db_name']}"
 
-    client = Client(f"tcp://{cfg['dask_scheduler_ip']}:{cfg['dask_scheduler_port']}")
-
-    print("loading candles into cache")
-    # Assuming you have a list of parameters for the tasks
-    parameters_list = [
-        (cfg['exchange'], cfg['symbol'], cfg['timespan-train']['start_date'], cfg['timespan-train']['finish_date']),
-        (cfg['exchange'], cfg['symbol'], cfg['timespan-testing']['start_date'], cfg['timespan-testing']['finish_date'])
-    ]  
-
-    for params in parameters_list:
-        print(params)
-        future = client.submit(pre_load_candles, *params)
-        print(future)
-        try:
-            result = future.result()
-            if result:
-                print("Task succeeded")
-            else:
-                print("Task failed")
-        except Exception as e:
-            print(f"Error with task {params}: {e}")
-
-    client.close()
         
     sampler = optuna.samplers.NSGAIISampler(population_size=cfg['population_size'], mutation_prob=cfg['mutation_prob'],
                                             crossover_prob=cfg['crossover_prob'], swapping_prob=cfg['swapping_prob'])
