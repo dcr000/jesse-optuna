@@ -61,22 +61,21 @@ def create_db(db_name: str) -> None:
     conn.close()
 
 def pre_load_candles(exchange: str, symbol: str, start_date: str, finish_date: str):
-    print("cat")
-    # path = pathlib.Path('storage/jesse-optuna')
-    # path.mkdir(parents=True, exist_ok=True)
+    path = pathlib.Path('storage/jesse-optuna')
+    path.mkdir(parents=True, exist_ok=True)
 
-    # cache_file_name = f"{exchange}-{symbol}-1m-{start_date}-{finish_date}.pickle"
-    # cache_file = pathlib.Path(f'storage/jesse-optuna/{cache_file_name}')
+    cache_file_name = f"{exchange}-{symbol}-1m-{start_date}-{finish_date}.pickle"
+    cache_file = pathlib.Path(f'storage/jesse-optuna/{cache_file_name}')
 
-    # if cache_file.is_file():
-    #     with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
-    #         candles = pickle.load(handle)
-    #         print("Loaded from cache")
-    # else:
-    #     candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
-    #     with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
-    #         pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    #         print("Loaded from db")
+    if cache_file.is_file():
+        with open(f'storage/jesse-optuna/{cache_file_name}', 'rb') as handle:
+            candles = pickle.load(handle)
+            print("Loaded from cache")
+    else:
+        candles = get_candles(exchange, symbol, '1m', start_date, finish_date)
+        with open(f'storage/jesse-optuna/{cache_file_name}', 'wb') as handle:
+            pickle.dump(candles, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            print("Loaded from db")
 
 @cli.command()
 def run() -> None:
