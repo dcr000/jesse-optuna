@@ -25,7 +25,7 @@ class JoblibStudy:
         print("Connected to Dask client.")
 
         # Submit all tasks at once and let Dask handle the distribution
-        futures = [client.submit(self._optimize_study, func,pure=False, n_trials=1, **optimize_parameters)
+        futures = [client.submit(self._optimize_study, func,pure=False, n_trials=1,resources={'process': 1}, **optimize_parameters)
                    for _ in range(n_trials)]
 
         # Wait for the tasks to complete and gather the results
