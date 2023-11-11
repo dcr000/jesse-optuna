@@ -99,7 +99,7 @@ def run() -> None:
 
     futures = []
     for params in parameters_list:
-        futures = client.submit(pre_load_candles, *params)
+        future = client.submit(pre_load_candles, *params)
         futures.append(future)
     for future in as_completed(futures):
         result = future.result()
