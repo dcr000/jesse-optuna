@@ -89,38 +89,25 @@ def run() -> None:
     client = Client(f"tcp://{cfg['dask_scheduler_ip']}:{cfg['dask_scheduler_port']}")
 
     print("loading candles into cache")
-    scheduler_info = client.scheduler_info()
-    workers = scheduler_info['workers']
-
-    # Number of workers
-    num_workers = len(workers)
     # Assuming you have a list of parameters for the tasks
-    parameters_list = [(
-            cfg['exchange'],
-            cfg['symbol'],
-            cfg['timespan-train']['start_date'],
-            cfg['timespan-train']['finish_date'],
-            ),(cfg['exchange'],
-            cfg['symbol'],
-            cfg['timespan-testing']['start_date'],
-            cfg['timespan-testing']['finish_date'],
-            )]  
+    parameters_list = [
+        (cfg['exchange'], cfg['symbol'], cfg['timespan-train']['start_date'], cfg['timespan-train']['finish_date']),
+        (cfg['exchange'], cfg['symbol'], cfg['timespan-testing']['start_date'], cfg['timespan-testing']['finish_date'])
+    ]  
 
-    futures = []
     for params in parameters_list:
         print(params)
-        for i in range(num_workers):
-            future = client.submit(pre_load_candles, *params)
-            print(future)
-            futures.append(future)
-            print(futures)
-    for future in as_completed(futures):
-        result = future.result()
-        if result:
-            print("Task succeeded")
-        else:
-            print("Task failed")
-    
+        future = client.submit(pre_load_candles, *params)
+        print(future)
+        try:
+            result = future.result()
+            if result:
+                print("Task succeeded")
+            else:
+                print("Task failed")
+        except Exception as e:
+            print(f"Error with task {params}: {e}")
+
     client.close()
         
     sampler = optuna.samplers.NSGAIISampler(population_size=cfg['population_size'], mutation_prob=cfg['mutation_prob'],
