@@ -18,15 +18,6 @@ import psycopg2
 from psycopg2 import OperationalError
 
 
-# Your custom function that always returns True
-def is_notebook():
-    return True
-
-# Monkey patch the original function
-jh.is_notebook = is_notebook
-
-# Test the function
-print(jh.is_notebook())  # This should now always return True
 
 logger = logging.getLogger()
 logger.addHandler(logging.FileHandler("jesse-optuna.log", mode="w"))
